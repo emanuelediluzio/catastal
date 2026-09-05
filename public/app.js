@@ -736,3 +736,25 @@ function downloadBlob(blob, filename) {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+// --- Modal Guida ---
+const guideBtn = document.getElementById('guideBtn');
+const guideModal = document.getElementById('guideModal');
+const closeGuideBtn = document.getElementById('closeGuideBtn');
+
+if (guideBtn && guideModal && closeGuideBtn) {
+  guideBtn.addEventListener('click', () => {
+    guideModal.classList.remove('hidden');
+  });
+
+  closeGuideBtn.addEventListener('click', () => {
+    guideModal.classList.add('hidden');
+  });
+
+  // Chiudi cliccando fuori dal modale
+  guideModal.addEventListener('click', (e) => {
+    if (e.target === guideModal) {
+      guideModal.classList.add('hidden');
+    }
+  });
+}
