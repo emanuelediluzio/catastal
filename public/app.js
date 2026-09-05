@@ -1,11 +1,23 @@
 // Catastal WebGIS Application Logic
 
-// Define EPSG:6706 (RDN2008 / geographic 2D) used by Agenzia delle Entrate WMS
+// EPSG:6706 (RDN2008 / geographic 2D) used by Agenzia delle Entrate WMS
 proj4.defs('EPSG:6706', '+proj=longlat +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +no_defs');
 
-// Target initial center: Chieti (P.lla 8, Foglio 21) from user screenshots
+// Target initial center: Chieti (P.lla 8, Foglio 21)
 const CHIETI_COORDS = [42.3739, 14.1978];
 const INITIAL_ZOOM = 18;
+
+// Toast notification
+function showToast(message, duration = 2500) {
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.classList.remove('hidden');
+  toast.classList.add('visible');
+  setTimeout(() => {
+    toast.classList.remove('visible');
+    setTimeout(() => toast.classList.add('hidden'), 300);
+  }, duration);
+}
 
 // Initialize Leaflet Map
 const map = L.map('map', {
@@ -15,10 +27,9 @@ const map = L.map('map', {
   zoomControl: false
 });
 
-// Move zoom controls to bottom right
 L.control.zoom({ position: 'bottomright' }).addTo(map);
 
-// Base Tile Layers (Using Google Satellite Hybrid with high-res imagery)
+// Base Tile Layers
 const baseLayers = {
   googleSat: L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
     maxZoom: 21,
@@ -34,13 +45,11 @@ const baseLayers = {
   })
 };
 
-// Add default basemap
 baseLayers.googleSat.addTo(map);
 
-// Agenzia delle Entrate WMS Catasto Layer via local backend proxy
+// Custom WMS Layer for Agenzia delle Entrate Catasto
 let currentLayers = ['province', 'CP.CadastralZoning', 'CP.CadastralParcel', 'fabbricati', 'codice_plla'];
 
-// Custom WMS Layer handling CRS EPSG:6706 bbox coordinate order
 const CatastoWmsLayer = L.TileLayer.extend({
   defaultWmsParams: {
     service: 'WMS',
@@ -74,17 +83,13 @@ const CatastoWmsLayer = L.TileLayer.extend({
     const tileBounds = this._tileCoordsToBounds(coords);
     const sw = tileBounds.getSouthWest();
     const ne = tileBounds.getNorthEast();
-
-    // WMS 1.3.0 with EPSG:6706 expects BBOX=minLat,minLon,maxLat,maxLon
     const bbox = [sw.lat, sw.lng, ne.lat, ne.lng].join(',');
-
     const obj = {
       ...this.wmsParams,
       bbox: bbox,
       width: this.getTileSize().x,
       height: this.getTileSize().y
     };
-
     const params = new URLSearchParams(obj).toString();
     return `${this._url}?${params}`;
   },
@@ -103,13 +108,12 @@ const CatastoWmsLayer = L.TileLayer.extend({
   }
 });
 
-// Set default opacity to 45% so satellite view is clearly visible underneath!
 const catastoLayer = new CatastoWmsLayer('/api/wms', {
   opacity: 0.45,
   zIndex: 100
 }).addTo(map);
 
-// Vector layer to store highlighted/selected parcels
+// Vector layer for selected parcels
 const parcelVectorLayer = L.geoJSON(null, {
   style: {
     color: '#3b82f6',
@@ -119,7 +123,11 @@ const parcelVectorLayer = L.geoJSON(null, {
   }
 }).addTo(map);
 
-// Leaflet-Geoman Toolbar setup for Polygon and Freehand / Lasso
+// Location marker layer
+let locationMarker = null;
+let locationCircle = null;
+
+// Leaflet-Geoman Toolbar
 map.pm.addControls({
   position: 'topright',
   drawCircle: false,
@@ -135,7 +143,6 @@ map.pm.addControls({
   removalMode: true
 });
 
-// Configure Geoman global style
 map.pm.setGlobalOptions({
   pathOptions: {
     color: '#fbbf24',
@@ -145,9 +152,10 @@ map.pm.setGlobalOptions({
   }
 });
 
-// Variables to track active measurements and layers
+// State
 let drawnLayers = [];
 let activePolygon = null;
+let savedParcels = JSON.parse(localStorage.getItem('catastal_saved') || '[]');
 
 // UI Elements
 const areaM2El = document.getElementById('areaM2');
@@ -158,11 +166,30 @@ const vertexCountEl = document.getElementById('vertexCount');
 const centroidCoordsEl = document.getElementById('centroidCoords');
 const zoomAlertText = document.getElementById('zoomAlertText');
 const cadastralDetailsEl = document.getElementById('cadastralDetails');
+const statusDot = document.getElementById('statusDot');
+const mouseCoordsEl = document.getElementById('mouseCoords');
+const zoomLevelEl = document.getElementById('zoomLevel');
 
-// Update measurements from layer geometry
+// Live mouse coordinate display
+map.on('mousemove', e => {
+  mouseCoordsEl.textContent = `Lat: ${e.latlng.lat.toFixed(6)}, Lon: ${e.latlng.lng.toFixed(6)}`;
+});
+
+map.on('zoomend', () => {
+  const z = map.getZoom();
+  zoomLevelEl.textContent = `Zoom: ${z}`;
+  if (z >= 15) {
+    zoomAlertText.innerHTML = `Zoom: <b>${z}</b> — Dettaglio catastale attivo`;
+  } else {
+    zoomAlertText.innerHTML = `Zoom: <b>${z}</b> — Ingrandisci a ≥15 per i numeri particella`;
+  }
+});
+
+// ---- MEASUREMENT FUNCTIONS ----
 function updateMeasurements(layer, customLabel = null) {
   if (!layer) return;
   activePolygon = layer;
+  statusDot.classList.add('active');
   const geojson = layer.toGeoJSON ? layer.toGeoJSON() : layer;
 
   try {
@@ -171,7 +198,7 @@ function updateMeasurements(layer, customLabel = null) {
     let vertices = 0;
 
     if (geojson.geometry.type === 'Polygon' || geojson.geometry.type === 'MultiPolygon') {
-      area = turf.area(geojson); // in square meters
+      area = turf.area(geojson);
       perimeter = turf.length(geojson, { units: 'meters' });
       vertices = geojson.geometry.coordinates[0].length - 1;
     } else if (geojson.geometry.type === 'LineString') {
@@ -179,35 +206,28 @@ function updateMeasurements(layer, customLabel = null) {
       vertices = geojson.geometry.coordinates.length;
     }
 
-    // Format Area (m²)
     areaM2El.innerHTML = `${area.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} <span class="unit">m²</span>`;
 
-    // Format Hectares (ha)
     const hectares = area / 10000;
     areaHaEl.textContent = `${hectares.toLocaleString('it-IT', { minimumFractionDigits: 4, maximumFractionDigits: 4 })} ha`;
 
-    // Format Are e Centiare (1 ara = 100 m², 1 centiara = 1 m²)
     const totalCentiare = Math.round(area);
     const are = Math.floor(totalCentiare / 100);
     const centiare = totalCentiare % 100;
     areaAreCentiareEl.textContent = `${are} a ${centiare} ca`;
 
-    // Format Perimeter
     perimetroMEl.textContent = `${perimeter.toLocaleString('it-IT', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} m`;
-
-    // Vertex count
     vertexCountEl.textContent = vertices;
 
-    // Centroid
     const centroid = turf.centroid(geojson);
     const [cLng, cLat] = centroid.geometry.coordinates;
     centroidCoordsEl.textContent = `Lat: ${cLat.toFixed(6)}, Lon: ${cLng.toFixed(6)}`;
 
-    // Update Tooltip
     if (layer.bindTooltip) {
-      const title = customLabel ? `<b>Particella:</b> ${customLabel}<br>` : '';
+      const title = customLabel ? `<b>P.lla ${customLabel}</b><br>` : '';
+      layer.unbindTooltip();
       layer.bindTooltip(
-        `${title}<b>Area:</b> ${Math.round(area).toLocaleString('it-IT')} m²<br><b>Perimetro:</b> ${Math.round(perimeter)} m`,
+        `${title}<b>${Math.round(area).toLocaleString('it-IT')} m²</b> | ${Math.round(perimeter)} m`,
         { permanent: false, direction: 'center', className: 'measure-tooltip' }
       );
     }
@@ -216,19 +236,20 @@ function updateMeasurements(layer, customLabel = null) {
   }
 }
 
-// Clear all measurements
 function clearAllDrawings() {
   drawnLayers.forEach(l => map.removeLayer(l));
   drawnLayers = [];
   parcelVectorLayer.clearLayers();
   activePolygon = null;
+  statusDot.classList.remove('active');
   areaM2El.innerHTML = `0.00 <span class="unit">m²</span>`;
   areaHaEl.textContent = '0.0000 ha';
   areaAreCentiareEl.textContent = '0 a 0 ca';
   perimetroMEl.textContent = '0.00 m';
   vertexCountEl.textContent = '0';
   centroidCoordsEl.textContent = 'Clicca sulla mappa o traccia un poligono';
-  cadastralDetailsEl.innerHTML = 'Fai clic su qualsiasi particella o numero per calcolare immediatamente i metri quadri!';
+  cadastralDetailsEl.innerHTML = 'Fai clic su qualsiasi particella per misurare automaticamente l\'area in m² e ottenere i dati catastali.';
+  showToast('🗑️ Misurazioni cancellate');
 }
 
 // Handle Geoman Creation Events
@@ -236,7 +257,6 @@ map.on('pm:create', e => {
   const layer = e.layer;
   drawnLayers.push(layer);
   updateMeasurements(layer);
-
   layer.on('pm:edit', () => updateMeasurements(layer));
   layer.on('pm:drag', () => updateMeasurements(layer));
   layer.on('pm:vertexadded', () => updateMeasurements(layer));
@@ -255,26 +275,23 @@ map.on('pm:remove', e => {
   }
 });
 
-// Button triggers for drawing
+// ---- DRAWING TOOLS ----
 document.getElementById('drawPolygonBtn').addEventListener('click', () => {
-  map.pm.enableDraw('Polygon', {
-    snappable: true,
-    snapDistance: 20,
-    finishOn: 'dblclick'
-  });
+  map.pm.enableDraw('Polygon', { snappable: true, snapDistance: 20, finishOn: 'dblclick' });
+  showToast('📐 Clicca per aggiungere vertici, doppio clic per chiudere');
 });
 
-// Freehand / Lasso tool implementation
+// Lasso / Freehand
 let lassoDrawing = false;
 let lassoPoints = [];
 let lassoPolyline = null;
-
 const drawLassoBtn = document.getElementById('drawLassoBtn');
 
 drawLassoBtn.addEventListener('click', () => {
   if (drawLassoBtn.classList.contains('active')) {
     drawLassoBtn.classList.remove('active');
     map.dragging.enable();
+    map.getContainer().style.cursor = '';
     map.off('mousedown', startLasso);
     map.off('mousemove', trackLasso);
     map.off('mouseup', finishLasso);
@@ -282,10 +299,10 @@ drawLassoBtn.addEventListener('click', () => {
     drawLassoBtn.classList.add('active');
     map.dragging.disable();
     map.getContainer().style.cursor = 'crosshair';
-
     map.on('mousedown', startLasso);
     map.on('mousemove', trackLasso);
     map.on('mouseup', finishLasso);
+    showToast('✏️ Tieni premuto e disegna il contorno del terreno');
   }
 });
 
@@ -311,12 +328,8 @@ function finishLasso() {
   lassoDrawing = false;
   if (lassoPolyline) map.removeLayer(lassoPolyline);
 
-  // Close polygon
   const polygon = L.polygon(lassoPoints, {
-    color: '#fbbf24',
-    fillColor: '#f59e0b',
-    fillOpacity: 0.35,
-    weight: 3
+    color: '#fbbf24', fillColor: '#f59e0b', fillOpacity: 0.35, weight: 3
   }).addTo(map);
 
   polygon.pm.enable();
@@ -327,7 +340,6 @@ function finishLasso() {
   polygon.on('pm:drag', () => updateMeasurements(polygon));
   polygon.on('click', () => updateMeasurements(polygon));
 
-  // Reset tool
   drawLassoBtn.classList.remove('active');
   map.dragging.enable();
   map.getContainer().style.cursor = '';
@@ -336,9 +348,15 @@ function finishLasso() {
   map.off('mouseup', finishLasso);
 }
 
+// Distance measurement tool
+document.getElementById('measureDistanceBtn').addEventListener('click', () => {
+  map.pm.enableDraw('Line', { snappable: true, snapDistance: 20 });
+  showToast('📏 Clicca per punti di misura, doppio clic per finire');
+});
+
 document.getElementById('clearMeasurementsBtn').addEventListener('click', clearAllDrawings);
 
-// Base Map Switcher
+// ---- BASE MAP SWITCHER ----
 document.querySelectorAll('input[name="basemap"]').forEach(input => {
   input.addEventListener('change', e => {
     Object.values(baseLayers).forEach(l => map.removeLayer(l));
@@ -349,20 +367,18 @@ document.querySelectorAll('input[name="basemap"]').forEach(input => {
   });
 });
 
-// Catasto Toggle & Opacity Slider
+// ---- CATASTO CONTROLS ----
 const catastoToggle = document.getElementById('catastoToggle');
 const opacitySlider = document.getElementById('opacitySlider');
 const opacityVal = document.getElementById('opacityVal');
 
-// Set default slider display to 45%
-opacitySlider.value = 45;
-opacityVal.textContent = '45%';
-
 catastoToggle.addEventListener('change', e => {
   if (e.target.checked) {
     catastoLayer.addTo(map);
+    showToast('🏛️ Layer catastale attivato');
   } else {
     map.removeLayer(catastoLayer);
+    showToast('Layer catastale disattivato');
   }
 });
 
@@ -372,7 +388,6 @@ opacitySlider.addEventListener('input', e => {
   catastoLayer.setOpacity(val / 100);
 });
 
-// Layer filter checkboxes
 function updateWmsLayers() {
   const layers = ['province', 'CP.CadastralZoning'];
   if (document.getElementById('layerParticelle').checked) layers.push('CP.CadastralParcel');
@@ -385,41 +400,65 @@ document.getElementById('layerParticelle').addEventListener('change', updateWmsL
 document.getElementById('layerFabbricati').addEventListener('change', updateWmsLayers);
 document.getElementById('layerCodici').addEventListener('change', updateWmsLayers);
 
-// Zoom Level Monitor
-map.on('zoomend', () => {
-  const z = map.getZoom();
-  if (z >= 15) {
-    zoomAlertText.innerHTML = `Zoom: <b>${z}</b> (Dettaglio catastale e codici particella attivi)`;
-  } else {
-    zoomAlertText.innerHTML = `Zoom: <b>${z}</b> (Ingrandisci a zoom ≥ 15 per particelle e numeri)`;
-  }
+// ---- PANEL COLLAPSE ----
+document.getElementById('collapseLeftBtn').addEventListener('click', () => {
+  document.getElementById('leftPanel').classList.toggle('collapsed');
 });
 
-// Quick Presets
+document.getElementById('collapseRightBtn').addEventListener('click', () => {
+  document.getElementById('rightPanel').classList.toggle('collapsed');
+});
+
+// ---- GEOLOCATION ----
+document.getElementById('locateMeBtn').addEventListener('click', () => {
+  if (!('geolocation' in navigator)) {
+    showToast('❌ Geolocalizzazione non supportata');
+    return;
+  }
+  showToast('📡 Rilevamento posizione GPS...');
+
+  navigator.geolocation.getCurrentPosition(pos => {
+    const { latitude, longitude, accuracy } = pos.coords;
+    map.flyTo([latitude, longitude], 18, { duration: 1.5 });
+
+    // Remove previous location markers
+    if (locationMarker) map.removeLayer(locationMarker);
+    if (locationCircle) map.removeLayer(locationCircle);
+
+    // Blue pulsing circle for accuracy
+    locationCircle = L.circle([latitude, longitude], {
+      radius: accuracy,
+      color: '#3b82f6',
+      fillColor: '#60a5fa',
+      fillOpacity: 0.15,
+      weight: 1
+    }).addTo(map);
+
+    // Marker
+    locationMarker = L.circleMarker([latitude, longitude], {
+      radius: 8,
+      color: '#fff',
+      fillColor: '#3b82f6',
+      fillOpacity: 1,
+      weight: 3
+    }).addTo(map);
+    locationMarker.bindPopup(`<b>La tua posizione</b><br>Precisione: ${Math.round(accuracy)} m`).openPopup();
+
+    showToast(`📍 Posizione rilevata (±${Math.round(accuracy)}m)`);
+
+    setTimeout(() => queryAndSelectParcel(latitude, longitude), 1500);
+  }, err => {
+    showToast('❌ Impossibile ottenere la posizione: ' + err.message);
+  }, { enableHighAccuracy: true, timeout: 10000 });
+});
+
+// ---- PRESETS ----
 document.getElementById('presetChietiBtn').addEventListener('click', () => {
   map.flyTo(CHIETI_COORDS, 18, { duration: 1.2 });
-  // Automatically query parcel at Chieti location
-  setTimeout(() => {
-    queryAndSelectParcel(CHIETI_COORDS[0], CHIETI_COORDS[1]);
-  }, 1300);
+  setTimeout(() => queryAndSelectParcel(CHIETI_COORDS[0], CHIETI_COORDS[1]), 1300);
 });
 
-document.getElementById('locateMeBtn').addEventListener('click', () => {
-  if ('geolocation' in navigator) {
-    navigator.geolocation.getCurrentPosition(pos => {
-      const { latitude, longitude } = pos.coords;
-      map.flyTo([latitude, longitude], 18);
-      L.marker([latitude, longitude]).addTo(map).bindPopup('La tua posizione').openPopup();
-      queryAndSelectParcel(latitude, longitude);
-    }, () => {
-      alert('Impossibile ottenere la posizione GPS.');
-    });
-  } else {
-    alert('Geolocalizzazione non supportata dal browser.');
-  }
-});
-
-// Search functionality via Backend Proxy
+// ---- SEARCH ----
 const searchInput = document.getElementById('searchInput');
 const searchBtn = document.getElementById('searchBtn');
 const searchResults = document.getElementById('searchResults');
@@ -432,7 +471,6 @@ async function performSearch() {
   try {
     const res = await fetch(`/api/search?q=${encodeURIComponent(q)}`);
     const data = await res.json();
-
     searchResults.innerHTML = '';
     if (data.length === 0) {
       searchResults.innerHTML = '<div class="search-item">Nessun risultato trovato</div>';
@@ -461,34 +499,26 @@ async function performSearch() {
 }
 
 searchBtn.addEventListener('click', performSearch);
-searchInput.addEventListener('keydown', e => {
-  if (e.key === 'Enter') performSearch();
-});
-
+searchInput.addEventListener('keydown', e => { if (e.key === 'Enter') performSearch(); });
 document.addEventListener('click', e => {
-  if (!e.target.closest('.search-box')) {
-    searchResults.classList.add('hidden');
-  }
+  if (!e.target.closest('.search-box')) searchResults.classList.add('hidden');
 });
 
-// CLICK TO SELECT & MEASURE PARCEL AUTOMATICALLY VIA WFS!
+// ---- WFS PARCEL QUERY ----
 async function queryAndSelectParcel(lat, lng) {
   cadastralDetailsEl.innerHTML = `
-    <div style="text-align: center; padding: 12px;">
-      <i class="fa-solid fa-spinner fa-spin"></i> <b>Interrogazione Catasto Agenzia Entrate...</b><br>
-      <span style="font-size:0.75rem; color: var(--text-muted);">Ricerca perimetro e calcolo metri quadri</span>
+    <div style="text-align: center; padding: 10px;">
+      <span class="loading-spinner"></span>
+      <div style="margin-top: 6px; font-size: 0.78rem;"><b>Interrogazione Catasto WFS...</b></div>
     </div>
   `;
 
   try {
-    // 1. Fetch official cadastral features in this area via WFS endpoint
     const res = await fetch(`/api/parcels?lat=${lat}&lon=${lng}&delta=0.0015`);
     const data = await res.json();
-
     let matchedFeature = null;
 
     if (data && data.features && data.features.length > 0) {
-      // Find the parcel polygon containing this click point
       const pt = turf.point([lng, lat]);
       for (const feat of data.features) {
         if (turf.booleanPointInPolygon(pt, feat)) {
@@ -496,99 +526,88 @@ async function queryAndSelectParcel(lat, lng) {
           break;
         }
       }
-
-      // If point wasn't strictly inside, pick closest parcel
       if (!matchedFeature) {
         let minDist = Infinity;
         for (const feat of data.features) {
           const c = turf.centroid(feat);
           const dist = turf.distance(pt, c);
-          if (dist < minDist) {
-            minDist = dist;
-            matchedFeature = feat;
-          }
+          if (dist < minDist) { minDist = dist; matchedFeature = feat; }
         }
       }
     }
 
     if (matchedFeature) {
-      // Clear previous selection and draw high-res polygon
       parcelVectorLayer.clearLayers();
       const leafletGeo = L.geoJSON(matchedFeature, {
         style: {
-          color: '#fbbf24',
-          weight: 3.5,
-          fillColor: '#f59e0b',
-          fillOpacity: 0.45,
-          dashArray: '2, 2'
+          color: '#fbbf24', weight: 3.5, fillColor: '#f59e0b', fillOpacity: 0.4, dashArray: null
         }
       });
       parcelVectorLayer.addLayer(leafletGeo);
 
-      // Make it editable with Geoman
       leafletGeo.eachLayer(l => {
         l.pm.enable();
         l.on('pm:edit', () => updateMeasurements(l, matchedFeature.properties.label));
         l.on('pm:drag', () => updateMeasurements(l, matchedFeature.properties.label));
       });
 
-      // Update Metric panels with true calculated area!
       updateMeasurements(matchedFeature, matchedFeature.properties.label);
 
-      // Show details in card
+      // Decode adminUnit to friendly name
+      const adminCode = matchedFeature.properties.adminUnit || '';
+      const natRef = matchedFeature.properties.nationalRef || '';
+      // Parse foglio from nationalRef: C632_002200.8 => Foglio 22
+      let foglio = '';
+      const refParts = natRef.match(/_([0-9]{6})/);
+      if (refParts) {
+        foglio = parseInt(refParts[1].substring(0, 4), 10).toString();
+      }
+
       cadastralDetailsEl.innerHTML = `
         <table class="cadastral-data-table">
-          <tr><td>Particella:</td><td><b style="color:var(--accent-gold); font-size:1.1rem;">${matchedFeature.properties.label || 'N/D'}</b></td></tr>
-          <tr><td>Rif. Nazionale:</td><td>${matchedFeature.properties.nationalRef || 'N/D'}</td></tr>
-          <tr><td>Comune:</td><td>${matchedFeature.properties.adminUnit || 'C632'}</td></tr>
-          <tr><td>ID INSPIRE:</td><td><small>${matchedFeature.properties.inspireId || 'N/D'}</small></td></tr>
+          <tr><td>Particella:</td><td><b style="color:var(--accent-gold); font-size:1.05rem;">${matchedFeature.properties.label || 'N/D'}</b></td></tr>
+          <tr><td>Foglio:</td><td>${foglio || 'N/D'}</td></tr>
+          <tr><td>Codice Comune:</td><td>${adminCode}</td></tr>
+          <tr><td>Rif. Nazionale:</td><td style="font-size:0.72rem;">${natRef}</td></tr>
+          <tr><td>ID INSPIRE:</td><td style="font-size:0.68rem;">${matchedFeature.properties.inspireId || 'N/D'}</td></tr>
           <tr><td>Coordinate:</td><td>${lat.toFixed(6)}, ${lng.toFixed(6)}</td></tr>
         </table>
-        <div style="margin-top: 10px; font-size: 0.78rem; color: #10b981; font-weight: 600;">
-          ✓ Poligono catastale agganciato e metri quadri calcolati automaticamente!
+        <div style="margin-top: 8px; font-size: 0.75rem; color: var(--accent-green); font-weight: 600;">
+          ✓ Poligono catastale ufficiale agganciato
         </div>
       `;
+
+      showToast(`📐 P.lla ${matchedFeature.properties.label} — ${Math.round(turf.area(matchedFeature)).toLocaleString('it-IT')} m²`);
     } else {
-      // Fallback to nominatim
       cadastralDetailsEl.innerHTML = `
-        <div style="font-size: 0.8rem; color: var(--accent-gold);">
-          Nessuna particella vettoriale trovata alle coordinate ${lat.toFixed(5)}, ${lng.toFixed(5)}. Usa lo strumento <b>Poligono</b> o <b>Lazo</b> per disegnarla a mano.
+        <div style="font-size: 0.78rem; color: var(--accent-gold); line-height:1.4;">
+          ⚠ Nessuna particella trovata. Usa <b>Poligono</b> o <b>Lazo</b> per disegnare manualmente.
         </div>
       `;
     }
   } catch (err) {
     console.error('Error fetching parcel:', err);
-    cadastralDetailsEl.innerHTML = `
-      <div style="font-size: 0.8rem; color: #ef4444;">
-        Errore di connessione con il servizio catastale. Usa lo strumento Poligono/Lazo manuale.
-      </div>
-    `;
+    cadastralDetailsEl.innerHTML = `<div style="color: #ef4444; font-size:0.78rem;">Errore di connessione con il catasto WFS.</div>`;
   }
 }
 
-// Map Click Listener
+// ---- MAP CLICK ----
 map.on('click', async e => {
   if (map.pm.globalDrawModeEnabled() || lassoDrawing) return;
-  const { lat, lng } = e.latlng;
-  queryAndSelectParcel(lat, lng);
+  queryAndSelectParcel(e.latlng.lat, e.latlng.lng);
 });
 
-// Export KML & GeoJSON
+// ---- EXPORT FUNCTIONS ----
 document.getElementById('exportGeoJsonBtn').addEventListener('click', () => {
-  if (!activePolygon) {
-    alert('Nessun poligono selezionato. Disegna prima una particella!');
-    return;
-  }
+  if (!activePolygon) { showToast('⚠ Nessun poligono da esportare'); return; }
   const data = activePolygon.toGeoJSON ? activePolygon.toGeoJSON() : activePolygon;
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   downloadBlob(blob, 'particella_catasto.geojson');
+  showToast('📁 GeoJSON scaricato');
 });
 
 document.getElementById('exportKmlBtn').addEventListener('click', () => {
-  if (!activePolygon) {
-    alert('Nessun poligono selezionato. Disegna prima una particella!');
-    return;
-  }
+  if (!activePolygon) { showToast('⚠ Nessun poligono da esportare'); return; }
   const geojson = activePolygon.toGeoJSON ? activePolygon.toGeoJSON() : activePolygon;
   const coords = geojson.geometry.coordinates[0];
   const coordString = coords.map(c => `${c[0]},${c[1]},0`).join(' ');
@@ -596,18 +615,17 @@ document.getElementById('exportKmlBtn').addEventListener('click', () => {
   const kml = `<?xml version="1.0" encoding="UTF-8"?>
 <kml xmlns="http://www.opengis.net/kml/2.2">
   <Document>
-    <name>Particella Catastale Misurata</name>
+    <name>Particella Catastale</name>
+    <Style id="parcelStyle">
+      <PolyStyle><color>7700ff00</color></PolyStyle>
+      <LineStyle><color>ff00ffff</color><width>2</width></LineStyle>
+    </Style>
     <Placemark>
       <name>Particella</name>
-      <description>Misurata con Catastal GIS</description>
+      <description>Misurata con Catastal GIS - Area: ${areaM2El.textContent}</description>
+      <styleUrl>#parcelStyle</styleUrl>
       <Polygon>
-        <extrude>1</extrude>
-        <altitudeMode>relativeToGround</altitudeMode>
-        <outerBoundaryIs>
-          <LinearRing>
-            <coordinates>${coordString}</coordinates>
-          </LinearRing>
-        </outerBoundaryIs>
+        <outerBoundaryIs><LinearRing><coordinates>${coordString}</coordinates></LinearRing></outerBoundaryIs>
       </Polygon>
     </Placemark>
   </Document>
@@ -615,25 +633,98 @@ document.getElementById('exportKmlBtn').addEventListener('click', () => {
 
   const blob = new Blob([kml], { type: 'application/vnd.google-earth.kml+xml' });
   downloadBlob(blob, 'particella_google_earth.kml');
+  showToast('🌍 KML scaricato — aprilo in Google Earth');
 });
 
-// Copy summary to clipboard
+document.getElementById('exportCsvBtn').addEventListener('click', () => {
+  if (!activePolygon) { showToast('⚠ Nessun poligono da esportare'); return; }
+  const csv = `Parametro,Valore
+Area (m²),"${areaM2El.textContent.replace(/<[^>]*>/g,'')}"
+Ettari (ha),"${areaHaEl.textContent}"
+Are / Centiare,"${areaAreCentiareEl.textContent}"
+Perimetro (m),"${perimetroMEl.textContent}"
+Vertici,"${vertexCountEl.textContent}"
+Baricentro,"${centroidCoordsEl.textContent}"
+`;
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  downloadBlob(blob, 'particella_dati.csv');
+  showToast('📊 CSV scaricato');
+});
+
 document.getElementById('copyStatsBtn').addEventListener('click', () => {
-  if (!activePolygon) {
-    alert('Disegna o seleziona un poligono prima di copiare i dati!');
+  if (!activePolygon) { showToast('⚠ Nessun dato da copiare'); return; }
+  const text = `Riepilogo Particella Catastale\nArea: ${areaM2El.textContent.replace(/<[^>]*>/g,'')}\nEttari: ${areaHaEl.textContent}\nAre/Centiare: ${areaAreCentiareEl.textContent}\nPerimetro: ${perimetroMEl.textContent}\nPosizione: ${centroidCoordsEl.textContent}`;
+  navigator.clipboard.writeText(text).then(() => showToast('📋 Dati copiati negli appunti'));
+});
+
+// ---- SAVE PARCEL ----
+document.getElementById('saveParcelBtn').addEventListener('click', () => {
+  if (!activePolygon) { showToast('⚠ Seleziona prima una particella'); return; }
+  const geojson = activePolygon.toGeoJSON ? activePolygon.toGeoJSON() : activePolygon;
+  const area = turf.area(geojson);
+  const centroid = turf.centroid(geojson);
+  const parcel = {
+    id: Date.now(),
+    label: geojson.properties?.label || `Custom ${savedParcels.length + 1}`,
+    area: Math.round(area),
+    lat: centroid.geometry.coordinates[1].toFixed(5),
+    lon: centroid.geometry.coordinates[0].toFixed(5),
+    geojson: geojson
+  };
+  savedParcels.push(parcel);
+  localStorage.setItem('catastal_saved', JSON.stringify(savedParcels));
+  renderSavedParcels();
+  showToast(`💾 Particella ${parcel.label} salvata`);
+});
+
+function renderSavedParcels() {
+  const list = document.getElementById('savedParcelsList');
+  if (savedParcels.length === 0) {
+    list.innerHTML = '<div class="saved-empty">Nessuna particella salvata. Clicca <i class="fa-solid fa-floppy-disk"></i> per salvarne una.</div>';
     return;
   }
-  const text = `Riepilogo Particella Catastale:
-Area: ${areaM2El.textContent}
-Ettari: ${areaHaEl.textContent}
-Are/Centiare: ${areaAreCentiareEl.textContent}
-Perimetro: ${perimetroMEl.textContent}
-Posizione: ${centroidCoordsEl.textContent}`;
+  list.innerHTML = savedParcels.map(p => `
+    <div class="saved-item" data-id="${p.id}">
+      <div>
+        <span class="saved-item-label">P.lla ${p.label}</span>
+        <span class="saved-item-area">${p.area.toLocaleString('it-IT')} m²</span>
+      </div>
+      <button class="saved-item-delete" data-id="${p.id}" title="Rimuovi"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+  `).join('');
 
-  navigator.clipboard.writeText(text).then(() => {
-    alert('Riepilogo copiato negli appunti!');
+  list.querySelectorAll('.saved-item').forEach(el => {
+    el.addEventListener('click', e => {
+      if (e.target.closest('.saved-item-delete')) return;
+      const id = parseInt(el.dataset.id);
+      const p = savedParcels.find(s => s.id === id);
+      if (p) {
+        parcelVectorLayer.clearLayers();
+        const leafletGeo = L.geoJSON(p.geojson, {
+          style: { color: '#fbbf24', weight: 3.5, fillColor: '#f59e0b', fillOpacity: 0.4 }
+        });
+        parcelVectorLayer.addLayer(leafletGeo);
+        map.fitBounds(leafletGeo.getBounds(), { padding: [60, 60] });
+        updateMeasurements(p.geojson, p.label);
+        showToast(`📌 P.lla ${p.label} caricata`);
+      }
+    });
   });
-});
+
+  list.querySelectorAll('.saved-item-delete').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const id = parseInt(btn.dataset.id);
+      savedParcels = savedParcels.filter(s => s.id !== id);
+      localStorage.setItem('catastal_saved', JSON.stringify(savedParcels));
+      renderSavedParcels();
+      showToast('🗑️ Particella rimossa');
+    });
+  });
+}
+
+// Init saved parcels on load
+renderSavedParcels();
 
 function downloadBlob(blob, filename) {
   const url = URL.createObjectURL(blob);

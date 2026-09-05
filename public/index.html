@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Catastal - Mappa Catastale Satellitare & Misurazione Terreni</title>
+  <title>Catastal GIS - Mappa Catastale Satellitare & Misurazione Terreni</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗺️</text></svg>">
   
   <!-- Leaflet CSS & JS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -20,10 +21,16 @@
   <!-- Turf.js for accurate geodesic area and perimeter calculation -->
   <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
 
+  <!-- tokml for KML export -->
+  <script src="https://unpkg.com/@tmcw/togeojson@5.8.0/dist/togeojson.umd.js"></script>
+
+  <!-- FileSaver for download -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
   <!-- FontAwesome Icons & Google Fonts -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -39,23 +46,36 @@
       <!-- Search Input -->
       <div class="search-box">
         <i class="fa-solid fa-magnifying-glass search-icon"></i>
-        <input type="text" id="searchInput" placeholder="Cerca indirizzo, località, comune (es. Chieti, Strada San Salvatore)..." />
+        <input type="text" id="searchInput" placeholder="Cerca indirizzo, località, comune..." />
         <button id="searchBtn" title="Cerca"><i class="fa-solid fa-arrow-right"></i></button>
         <div id="searchResults" class="search-results hidden"></div>
       </div>
 
       <!-- Quick Preset Buttons -->
       <div class="quick-nav">
-        <button id="presetChietiBtn" class="pill-btn"><i class="fa-solid fa-location-dot"></i> Chieti (P.lla 8, Fg 21)</button>
-        <button id="locateMeBtn" class="pill-btn"><i class="fa-solid fa-crosshairs"></i> La mia posizione</button>
+        <button id="presetChietiBtn" class="pill-btn"><i class="fa-solid fa-location-dot"></i> Chieti F.21 P.8</button>
+        <button id="locateMeBtn" class="pill-btn pulse-glow"><i class="fa-solid fa-crosshairs"></i> Posizione Attuale</button>
       </div>
     </header>
 
     <!-- Map Container -->
     <div id="map"></div>
 
+    <!-- Coordinate Display Footer -->
+    <div class="coord-bar" id="coordBar">
+      <span id="mouseCoords">Lat: --, Lon: --</span>
+      <span class="coord-sep">|</span>
+      <span id="zoomLevel">Zoom: 18</span>
+      <span class="coord-sep">|</span>
+      <span>© Agenzia delle Entrate (CC-BY 4.0)</span>
+    </div>
+
     <!-- Floating Tool Panel (Left) -->
-    <aside class="floating-panel left-panel">
+    <aside class="floating-panel left-panel" id="leftPanel">
+      <button class="panel-collapse-btn" id="collapseLeftBtn" title="Nascondi pannello">
+        <i class="fa-solid fa-chevron-left"></i>
+      </button>
+
       <div class="panel-card">
         <div class="card-header">
           <h3><i class="fa-solid fa-sliders"></i> Livelli Mappa</h3>
@@ -67,15 +87,15 @@
           <div class="radio-toggle">
             <label class="radio-btn">
               <input type="radio" name="basemap" value="googleSat" checked>
-              <span>Google Sat</span>
+              <span><i class="fa-solid fa-satellite"></i> Satellite</span>
             </label>
             <label class="radio-btn">
               <input type="radio" name="basemap" value="esriSat">
-              <span>Esri HD</span>
+              <span><i class="fa-solid fa-image"></i> Esri HD</span>
             </label>
             <label class="radio-btn">
               <input type="radio" name="basemap" value="osm">
-              <span>Stradale</span>
+              <span><i class="fa-solid fa-road"></i> Strada</span>
             </label>
           </div>
         </div>
@@ -83,7 +103,7 @@
         <!-- Catasto Layer Controls -->
         <div class="control-group">
           <div class="toggle-row">
-            <span class="toggle-title"><i class="fa-solid fa-landmark"></i> Catasto Agenzia Entrate</span>
+            <span class="toggle-title"><i class="fa-solid fa-landmark"></i> Catasto Ufficiale</span>
             <label class="switch">
               <input type="checkbox" id="catastoToggle" checked>
               <span class="slider round"></span>
@@ -93,22 +113,22 @@
           <div class="slider-row">
             <div class="slider-label">
               <span>Opacità Catasto</span>
-              <span id="opacityVal">85%</span>
+              <span id="opacityVal">45%</span>
             </div>
-            <input type="range" id="opacitySlider" min="0" max="100" value="85" />
+            <input type="range" id="opacitySlider" min="0" max="100" value="45" />
           </div>
 
           <div class="layer-options">
-            <label><input type="checkbox" id="layerParticelle" checked> Particelle & Fogli</label>
-            <label><input type="checkbox" id="layerFabbricati" checked> Fabbricati</label>
-            <label><input type="checkbox" id="layerCodici" checked> Numeri Particella</label>
+            <label><input type="checkbox" id="layerParticelle" checked> <i class="fa-solid fa-border-all"></i> Particelle & Fogli</label>
+            <label><input type="checkbox" id="layerFabbricati" checked> <i class="fa-solid fa-building"></i> Fabbricati</label>
+            <label><input type="checkbox" id="layerCodici" checked> <i class="fa-solid fa-hashtag"></i> Numeri Particella</label>
           </div>
         </div>
 
         <!-- Zoom Indicator & Notice -->
         <div class="info-alert" id="zoomAlert">
           <i class="fa-solid fa-circle-info"></i>
-          <span id="zoomAlertText">Zoom attuale: 17 (I numeri delle particelle compaiono a zoom ≥ 15)</span>
+          <span id="zoomAlertText">Zoom: <b>18</b> — Dettaglio catastale attivo</span>
         </div>
       </div>
 
@@ -124,19 +144,36 @@
           <button id="drawLassoBtn" class="action-btn" title="Disegna a mano libera tenendo premuto">
             <i class="fa-solid fa-pencil"></i> Lazo / Libera
           </button>
-          <button id="clearMeasurementsBtn" class="action-btn danger" title="Elimina tutte le misurazioni">
-            <i class="fa-solid fa-trash-can"></i> Cancella
+          <button id="measureDistanceBtn" class="action-btn" title="Misura distanza tra due punti">
+            <i class="fa-solid fa-ruler"></i> Distanza
           </button>
+          <button id="clearMeasurementsBtn" class="action-btn danger" title="Elimina tutte le misurazioni">
+            <i class="fa-solid fa-trash-can"></i> Cancella Tutto
+          </button>
+        </div>
+      </div>
+
+      <!-- Saved Parcels / History -->
+      <div class="panel-card">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-bookmark"></i> Particelle Salvate</h3>
+        </div>
+        <div id="savedParcelsList" class="saved-list">
+          <div class="saved-empty">Nessuna particella salvata. Clicca <i class="fa-solid fa-floppy-disk"></i> per salvarne una.</div>
         </div>
       </div>
     </aside>
 
     <!-- Floating Measurement Card (Right) -->
-    <aside class="floating-panel right-panel" id="measurePanel">
+    <aside class="floating-panel right-panel" id="rightPanel">
+      <button class="panel-collapse-btn right" id="collapseRightBtn" title="Nascondi pannello">
+        <i class="fa-solid fa-chevron-right"></i>
+      </button>
+
       <div class="panel-card live-stats-card">
         <div class="card-header">
           <h3><i class="fa-solid fa-chart-area"></i> Misura Particella</h3>
-          <span class="status-indicator active"></span>
+          <span class="status-indicator" id="statusDot"></span>
         </div>
 
         <div class="stats-metric-primary">
@@ -177,22 +214,33 @@
           <button id="exportKmlBtn" class="export-btn" title="Scarica KML per Google Earth">
             <i class="fa-solid fa-earth-americas"></i> KML
           </button>
+          <button id="exportCsvBtn" class="export-btn" title="Esporta riepilogo CSV">
+            <i class="fa-solid fa-file-csv"></i> CSV
+          </button>
           <button id="copyStatsBtn" class="export-btn" title="Copia riepilogo negli appunti">
             <i class="fa-solid fa-copy"></i> Copia
           </button>
         </div>
+
+        <!-- Save Parcel -->
+        <button id="saveParcelBtn" class="save-parcel-btn">
+          <i class="fa-solid fa-floppy-disk"></i> Salva Particella
+        </button>
       </div>
 
       <!-- Cadastral Inspection / Click Card -->
       <div class="panel-card" id="cadastralInfoCard">
         <div class="card-header">
-          <h3><i class="fa-solid fa-circle-question"></i> Info Punto Catastale</h3>
+          <h3><i class="fa-solid fa-circle-question"></i> Info Catastale</h3>
         </div>
         <div id="cadastralDetails" class="cadastral-details-empty">
-          Fai clic su qualsiasi punto della mappa per rilevare coordinate, comune e interrogare il catasto.
+          Fai clic su qualsiasi particella per misurare automaticamente l'area in m² e ottenere i dati catastali.
         </div>
       </div>
     </aside>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="toast hidden"></div>
   </div>
 
   <script src="app.js"></script>
