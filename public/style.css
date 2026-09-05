@@ -281,8 +281,6 @@ body, html {
   flex-direction: column;
   gap: 10px;
   max-height: calc(100vh - 114px);
-  overflow-y: auto;
-  scrollbar-width: none;
   transition: transform 0.3s ease, opacity 0.3s ease;
 }
 
@@ -894,4 +892,22 @@ input[type=range] {
   background: rgba(37, 99, 235, 0.3);
   box-shadow: 0 0 12px rgba(37, 99, 235, 0.4);
   color: #fff;
+}
+
+.floating-panel {
+  overflow: visible !important;
+}
+
+.panel-scroll-area {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: calc(100vh - 114px);
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding-bottom: 20px;
+}
+
+.panel-scroll-area::-webkit-scrollbar {
+  display: none;
 }

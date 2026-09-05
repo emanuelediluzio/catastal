@@ -1,33 +1,75 @@
-# Catastal GIS 🗺️
+<div align="center">
+  <img src="https://raw.githubusercontent.com/emanuelediluzio/catastal/main/public/favicon.ico" width="80" alt="Catastal GIS Logo">
+  <h1>Catastal GIS 🗺️</h1>
+  <p><strong>Applicazione WebGIS open-source per la consultazione e misurazione delle particelle catastali in Italia.</strong></p>
 
-Un'applicazione WebGIS gratuita e open-source per la consultazione e misurazione delle particelle catastali in Italia, costruita con Leaflet e le API (WMS/WFS) dell'Agenzia delle Entrate.
+  [![Vercel Deployment](https://img.shields.io/badge/Vercel-Deployed-000000?style=for-the-badge&logo=vercel)](https://catastal.vercel.app/)
+  [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+</div>
 
-🌍 **Live Demo:** [https://catastal.vercel.app/](https://catastal.vercel.app/)
+<br>
 
-## Funzionalità
-- 🛰️ **Mappe ibride ad alta risoluzione** (Google Satellite / Esri HD)
-- 🏛️ **Sovrapposizione ufficiale in tempo reale** del catasto (WMS Agenzia Entrate)
-- 🖱️ **Click-to-measure**: Clicca su qualsiasi terreno per ottenere istantaneamente i metri quadri esatti (WFS) interrogando direttamente l'Agenzia delle Entrate
-- 📐 Strumenti avanzati di disegno per poligoni, lazo a mano libera e linee di distanza
-- 📡 Geolocalizzazione ad alta precisione
-- 💾 Salvataggio delle particelle in locale
-- 📊 Esportazione in GeoJSON, KML e CSV per Google Earth e CAD
-- 🔗 Collegamento rapido al portale SPID dell'Agenzia delle Entrate per visure
+<div align="center">
+  <a href="https://catastal.vercel.app/"><strong>🌍 Prova la Live Demo qui!</strong></a>
+</div>
 
-## Note Tecniche
-L'app sfrutta un server proxy (Express.js) per aggirare i problemi di CORS e formattare le risposte dai server ministeriali.
-Il calcolo delle aree geodetiche e le manipolazioni geometriche avvengono via Turf.js.
-Le proiezioni catastali originali (EPSG:6706) sono gestite tramite proj4leaflet.
+<br>
 
-Per il deployment su Vercel, il proxy utilizza un parser XML Node.js nativo (xml2js) per interrogare le particelle in millisecondi.
+## 📸 Anteprima
+*(Aggiungi qui uno screenshot dell'interfaccia dell'applicazione)*
+<!-- ![Screenshot dell'app](link-allo-screenshot.png) -->
 
-## Avvio in Locale
+---
 
-```bash
-npm install
-npm start
-```
-Il server sarà attivo su `http://localhost:3000`.
+## ✨ Funzionalità Principali
 
-## Limitazioni API
-L'Agenzia delle Entrate fornisce i dati liberamente (CC-BY 4.0), tuttavia l'endpoint pubblico non supporta la ricerca testuale filtrata per Foglio e Particella. È necessario navigare visivamente sul proprio Comune (usando la barra di ricerca in alto) e selezionare la particella per averne i dati e la misurazione. Per l'identificazione personale è presente il pulsante "Visura Ufficiale (SPID)".
+- 🛰️ **Mappe Ibride ad Alta Risoluzione**: Scegli tra Google Satellite, Esri HD o mappa stradale OpenStreetMap.
+- 🏛️ **Catasto in Tempo Reale**: Sovrapposizione ufficiale dei dati dell'Agenzia delle Entrate tramite WMS (fogli, particelle, fabbricati).
+- 🖱️ **Click-to-Measure (WFS)**: Clicca su qualsiasi terreno per estrarre la geometria esatta dal server WFS ministeriale e calcolarne l'area (m², ettari, are/centiare).
+- 📐 **Strumenti di Disegno Avanzati**: Traccia poligoni a mano, usa il lazo o misura distanze con precisione millimetrica.
+- 📍 **Geolocalizzazione GPS**: Trova la tua posizione attuale con cerchio di precisione integrato.
+- 💾 **Salvataggio Locale**: Salva le misurazioni importanti per non perderle.
+- 📊 **Esportazione Multi-Formato**: Scarica i dati in **GeoJSON**, **KML** (per Google Earth) o **CSV**.
+- 🪪 **Integrazione SPID**: Link diretto e precompilato al portale dell'Agenzia delle Entrate per visure ufficiali.
+
+## 🚀 Tecnologie Utilizzate
+
+- **Frontend**: HTML5, CSS3 (Glassmorphism UI), JavaScript ES6+
+- **Librerie Cartografiche**: [Leaflet.js](https://leafletjs.com/), [Geoman](https://geoman.io/), [Turf.js](https://turfjs.org/) (geometrie), Proj4Leaflet (per EPSG:6706).
+- **Backend (Proxy)**: Node.js, Express, Axios, `xml2js`.
+- **Integrazioni**: API WMS/WFS Agenzia delle Entrate (CC-BY 4.0), API Nominatim (OSM).
+
+## 🛠️ Installazione Locale
+
+Vuoi far girare il progetto sul tuo computer?
+
+1. **Clona la repository**:
+   ```bash
+   git clone https://github.com/emanuelediluzio/catastal.git
+   cd catastal
+   ```
+
+2. **Installa le dipendenze**:
+   ```bash
+   npm install
+   ```
+
+3. **Avvia il server**:
+   ```bash
+   npm start
+   ```
+   L'app sarà disponibile su `http://localhost:3000`.
+
+## 🧠 Note di Architettura (Vercel)
+
+L'applicazione comunica con i servizi cartografici ministeriali. Poiché le API dell'Agenzia delle Entrate restituiscono XML complessi (GML) con namespace specifici per le particelle, il proxy backend si occupa di:
+1. Interrogare l'endpoint WFS `owfs01.php`.
+2. Parsare l'XML al volo tramite `xml2js` in modo **Vercel-friendly** (niente child-processes Python, per la massima compatibilità serverless).
+3. Convertire le geometrie GML in GeoJSON pulito consumabile dal frontend.
+
+## ⚠️ Limitazioni e Open Data
+I dati catastali mostrati sono aperti (Licenza **CC-BY 4.0 Agenzia delle Entrate**).
+*Nota tecnica*: L'endpoint pubblico WFS non permette query CQL filtrate direttamente per Foglio/Particella tramite API pubbliche (Akamai WAF blocca la richiesta). La ricerca avviene visualmente tramite Bounding Box (BBOX) o tramite il motore di ricerca dei Comuni.
+
+---
+**Sviluppato da [Emanuele Di Luzio](https://github.com/emanuelediluzio)**
