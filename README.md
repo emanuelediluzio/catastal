@@ -1,48 +1,33 @@
-# Catastal GIS 🗺️📐
+# Catastal GIS 🗺️
 
-Piattaforma WebGIS interattiva che unisce la **vista satellitare reale ad alta definizione** (Google Satellite ed Esri World Imagery) con la **Cartografia Catastale Ufficiale dell'Agenzia delle Entrate** (servizio WMS INSPIRE nazionale gratuito).
+Un'applicazione WebGIS gratuita e open-source per la consultazione e misurazione delle particelle catastali in Italia, costruita con Leaflet e le API (WMS/WFS) dell'Agenzia delle Entrate.
 
-Include gli strumenti di **misurazione poligonale geodetica**, **lazo a mano libera**, calcolo automatico in **metri quadri ($m^2$)**, **ettari (ha)**, **are e centiare**, **perimetro (m)**, ispezione del punto ed esportazione in **GeoJSON** e **KML (Google Earth)**.
+🌍 **Live Demo:** [https://catastal.vercel.app/](https://catastal.vercel.app/)
 
----
+## Funzionalità
+- 🛰️ **Mappe ibride ad alta risoluzione** (Google Satellite / Esri HD)
+- 🏛️ **Sovrapposizione ufficiale in tempo reale** del catasto (WMS Agenzia Entrate)
+- 🖱️ **Click-to-measure**: Clicca su qualsiasi terreno per ottenere istantaneamente i metri quadri esatti (WFS) interrogando direttamente l'Agenzia delle Entrate
+- 📐 Strumenti avanzati di disegno per poligoni, lazo a mano libera e linee di distanza
+- 📡 Geolocalizzazione ad alta precisione
+- 💾 Salvataggio delle particelle in locale
+- 📊 Esportazione in GeoJSON, KML e CSV per Google Earth e CAD
+- 🔗 Collegamento rapido al portale SPID dell'Agenzia delle Entrate per visure
 
-## 🚀 Funzionalità Principali
+## Note Tecniche
+L'app sfrutta un server proxy (Express.js) per aggirare i problemi di CORS e formattare le risposte dai server ministeriali.
+Il calcolo delle aree geodetiche e le manipolazioni geometriche avvengono via Turf.js.
+Le proiezioni catastali originali (EPSG:6706) sono gestite tramite proj4leaflet.
 
-- 🛰️ **Mappe Satellitari HD**: Google Satellite, Esri World Imagery e OpenStreetMap alternabili istantaneamente.
-- 🏛️ **Sovrapposizione Catasto Agenzia Entrate**: layer ufficiale WMS nazionale con confini di particelle, fogli, fabbricati e codici particella.
-- 🎚️ **Trasparenza Regolabile**: cursore per sfumare il catasto sulla foto satellitare reale e individuare recinzioni, alberi e strade.
-- 📐 **Misurazione Poligonale Interattiva**: traccia i vertici con vertici agganciabili (snap) e modificabili in tempo reale.
-- ✏️ **Strumento Lazo / Disegno a Mano Libera**: premi e trascina il mouse per tracciare una sagoma irregolare a mano libera, con chiusura automatica del poligono.
-- 📊 **Calcolo Metrico Immediato**:
-  - Metri quadri ($m^2$) precisi al millimetro tramite calcolo geodetico su ellissoide WGS84 (`Turf.js`).
-  - Ettari (`ha`).
-  - Unità catastali storiche: **Are (`a`)** e **Centiare (`ca`)** (es. `116 a 13 ca`).
-  - Perimetro lineare in metri ($m$).
-  - Coordinate geografiche del baricentro (Latitudine, Longitudine).
-- 🔍 **Ricerca Indirizzi e Località**: barra di ricerca collegata al geocoder nazionale.
-- 💾 **Esportazione Dati**: esporta il poligono in formato **KML** (apribile in Google Earth Pro / Earth Web) o **GeoJSON**.
+Per il deployment su Vercel, il proxy utilizza un parser XML Node.js nativo (xml2js) per interrogare le particelle in millisecondi.
 
----
-
-## 💻 Avvio e Installazione
-
-Assicurati di avere [Node.js](https://nodejs.org/) installato.
+## Avvio in Locale
 
 ```bash
-# 1. Entra nella cartella del repository
-cd /Users/emanuelediluzio/repos/catastal
-
-# 2. Installa le dipendenze
 npm install
-
-# 3. Avvia il server
 npm start
 ```
+Il server sarà attivo su `http://localhost:3000`.
 
-Apri il browser su:
-👉 **[http://localhost:3000](http://localhost:3000)**
-
----
-
-## 📋 Note sui Dati Catastali
-I dati cartografici catastali provengono dal servizio ufficiale WMS INSPIRE dell'Agenzia delle Entrate rilasciato con licenza **CC-BY 4.0** (Agenzia delle Entrate). Le particelle e i numeri catastali diventano visibili automaticamente a livelli di zoom ravvicinati ($\ge 15$).
+## Limitazioni API
+L'Agenzia delle Entrate fornisce i dati liberamente (CC-BY 4.0), tuttavia l'endpoint pubblico non supporta la ricerca testuale filtrata per Foglio e Particella. È necessario navigare visivamente sul proprio Comune (usando la barra di ricerca in alto) e selezionare la particella per averne i dati e la misurazione. Per l'identificazione personale è presente il pulsante "Visura Ufficiale (SPID)".

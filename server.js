@@ -40,43 +40,82 @@ app.get('/api/wms', async (req, res) => {
   }
 });
 
-// WFS endpoint: fetches official Cadastral Parcels as GeoJSON using python parser
-app.get('/api/parcels', (req, res) => {
+const xml2js = require('xml2js');
+
+// WFS endpoint: fetches official Cadastral Parcels as GeoJSON using native Node.js (Vercel friendly)
+app.get('/api/parcels', async (req, res) => {
   const { lat, lon, delta = 0.0015 } = req.query;
   if (!lat || !lon) {
     return res.status(400).json({ error: 'lat and lon are required' });
   }
 
-  const py = spawn('python3', [
-    path.join(__dirname, 'parse_parcels.py'),
-    lat.toString(),
-    lon.toString(),
-    delta.toString()
-  ]);
+  const fLat = parseFloat(lat);
+  const fLon = parseFloat(lon);
+  const fDelta = parseFloat(delta);
+  const bbox = `${fLat - fDelta},${fLon - fDelta},${fLat + fDelta},${fLon + fDelta},urn:ogc:def:crs:EPSG::6706`;
+  const url = `https://wfs.cartografia.agenziaentrate.gov.it/inspire/wfs/owfs01.php?SERVICE=WFS&VERSION=2.0.0&REQUEST=GetFeature&TYPENAMES=CP:CadastralParcel&BBOX=${bbox}`;
 
-  let stdoutData = '';
-  let stderrData = '';
+  try {
+    const response = await axios.get(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+      timeout: 12000
+    });
 
-  py.stdout.on('data', data => {
-    stdoutData += data.toString();
-  });
+    const parser = new xml2js.Parser({ explicitArray: false, ignoreAttrs: true });
+    parser.parseString(response.data, (err, result) => {
+      if (err) throw new Error('XML Parse Error');
+      
+      const features = [];
+      const featureCollection = result['wfs:FeatureCollection'] || result['FeatureCollection'];
+      if (!featureCollection) return res.json({ type: "FeatureCollection", features: [] });
 
-  py.stderr.on('data', data => {
-    stderrData += data.toString();
-  });
+      let members = featureCollection['wfs:member'] || featureCollection['member'] || [];
+      if (!Array.isArray(members)) members = [members];
 
-  py.on('close', code => {
-    if (code !== 0) {
-      console.error('Python parse error:', stderrData);
-      return res.status(500).json({ error: 'Failed to parse cadastral features' });
-    }
-    try {
-      const json = JSON.parse(stdoutData);
-      res.json(json);
-    } catch (e) {
-      res.status(500).json({ error: 'Invalid JSON from parcel parser' });
-    }
-  });
+      members.forEach(member => {
+        const parcel = member['CP:CadastralParcel'];
+        if (!parcel) return;
+
+        const label = parcel['CP:LABEL'] || "";
+        const ref = parcel['CP:NATIONALCADASTRALREFERENCE'] || "";
+        const admin = parcel['CP:ADMINISTRATIVEUNIT'] || "";
+        const inspire = parcel['CP:INSPIREID_LOCALID'] || "";
+
+        try {
+          const msGeom = parcel['CP:msGeometry'];
+          if (!msGeom) return;
+          const polygon = msGeom['gml:Polygon'] || msGeom['Polygon'];
+          if (!polygon) return;
+          const exterior = polygon['gml:exterior'] || polygon['exterior'];
+          const ring = exterior['gml:LinearRing'] || exterior['LinearRing'];
+          const posList = ring['gml:posList'] || ring['posList'];
+
+          if (!posList) return;
+
+          const rawPts = posList.trim().split(/\s+/);
+          const coords = [];
+          for (let i = 0; i < rawPts.length; i += 2) {
+            coords.push([parseFloat(rawPts[i+1]), parseFloat(rawPts[i])]); // GeoJSON is lon, lat
+          }
+
+          if (coords.length >= 3) {
+            features.push({
+              type: "Feature",
+              properties: { label, nationalRef: ref, adminUnit: admin, inspireId: inspire },
+              geometry: { type: "Polygon", coordinates: [coords] }
+            });
+          }
+        } catch (e) {
+          // Skip parcel if geometry parsing fails
+        }
+      });
+
+      res.json({ type: "FeatureCollection", features });
+    });
+  } catch (error) {
+    console.error('WFS Fetch/Parse error:', error.message);
+    res.status(500).json({ error: 'Failed to fetch or parse cadastral features', features: [] });
+  }
 });
 
 // Geocoding Proxy (using Nominatim OpenStreetMap)

@@ -1,0 +1,13 @@
+<wfs:GetFeature service="WFS" version="2.0.0"
+  xmlns:wfs="http://www.opengis.net/wfs/2.0"
+  xmlns:fes="http://www.opengis.net/fes/2.0"
+  xmlns:CP="http://mapserver.gis.umn.edu/mapserver">
+  <wfs:Query typeNames="CP:CadastralParcel">
+    <fes:Filter>
+      <fes:PropertyIsEqualTo>
+        <fes:ValueReference>CP:NATIONALCADASTRALREFERENCE</fes:ValueReference>
+        <fes:Literal>C632_002200.10</fes:Literal>
+      </fes:PropertyIsEqualTo>
+    </fes:Filter>
+  </wfs:Query>
+</wfs:GetFeature>

@@ -243,31 +243,33 @@ body, html {
 /* Panel Collapse Button */
 .panel-collapse-btn {
   position: absolute;
-  top: 8px;
-  right: -14px;
-  width: 28px;
-  height: 28px;
+  top: 12px;
+  right: -20px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  background: var(--bg-dark);
-  border: 1px solid var(--border-color);
-  color: var(--text-muted);
+  background: var(--primary);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  color: #fff;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.7rem;
-  z-index: 10;
-  transition: all 0.2s;
+  font-size: 0.9rem;
+  z-index: 1001;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.5);
 }
 
 .panel-collapse-btn.right {
   right: auto;
-  left: -14px;
+  left: -20px;
 }
 
 .panel-collapse-btn:hover {
-  background: var(--primary);
-  color: #fff;
+  background: var(--primary-hover);
+  transform: scale(1.12);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.7);
 }
 
 /* Floating Panels */
@@ -867,4 +869,29 @@ input[type=range] {
     bottom: 36px;
     max-height: 50vh;
   }
+}
+
+/* SPID Button */
+.spid-btn {
+  width: 100%;
+  padding: 8px;
+  background: rgba(37, 99, 235, 0.15);
+  border: 1px solid rgba(37, 99, 235, 0.4);
+  color: #60a5fa;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s;
+  margin-top: 5px;
+}
+
+.spid-btn:hover {
+  background: rgba(37, 99, 235, 0.3);
+  box-shadow: 0 0 12px rgba(37, 99, 235, 0.4);
+  color: #fff;
 }
