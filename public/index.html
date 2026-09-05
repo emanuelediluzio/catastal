@@ -24,6 +24,11 @@
   <!-- tokml for KML export -->
   <script src="https://unpkg.com/@tmcw/togeojson@5.8.0/dist/togeojson.umd.js"></script>
 
+  
+  <!-- html2canvas and jsPDF for Image/PDF Export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
   <!-- FileSaver for download -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
@@ -215,14 +220,20 @@
           <button id="exportGeoJsonBtn" class="export-btn" title="Scarica GeoJSON">
             <i class="fa-solid fa-file-code"></i> GeoJSON
           </button>
-          <button id="exportKmlBtn" class="export-btn" title="Scarica KML per Google Earth">
+          <button id="exportKmlBtn" class="export-btn" title="Scarica KML">
             <i class="fa-solid fa-earth-americas"></i> KML
           </button>
-          <button id="exportCsvBtn" class="export-btn" title="Esporta riepilogo CSV">
+          <button id="exportCsvBtn" class="export-btn" title="Scarica CSV">
             <i class="fa-solid fa-file-csv"></i> CSV
           </button>
-          <button id="copyStatsBtn" class="export-btn" title="Copia riepilogo negli appunti">
+          <button id="copyStatsBtn" class="export-btn" title="Copia Appunti">
             <i class="fa-solid fa-copy"></i> Copia
+          </button>
+          <button id="exportImageBtn" class="export-btn" title="Esporta Immagine JPG">
+            <i class="fa-solid fa-image"></i> Immagine
+          </button>
+          <button id="exportPdfBtn" class="export-btn" title="Esporta Report PDF">
+            <i class="fa-solid fa-file-pdf"></i> PDF
           </button>
         </div>
 

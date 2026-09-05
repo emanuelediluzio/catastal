@@ -758,3 +758,80 @@ if (guideBtn && guideModal && closeGuideBtn) {
     }
   });
 }
+
+// --- Export Image / PDF ---
+const exportImageBtn = document.getElementById('exportImageBtn');
+const exportPdfBtn = document.getElementById('exportPdfBtn');
+
+async function captureScreen() {
+  showToast('Generazione in corso... attendi.', 'info');
+  try {
+    const canvas = await html2canvas(document.body, {
+      useCORS: true,
+      allowTaint: true,
+      ignoreElements: (el) => {
+        // Nascondi i bottoni durante lo screenshot
+        if (el.classList.contains('export-actions') || el.classList.contains('panel-collapse-btn')) {
+          return true;
+        }
+        return false;
+      }
+    });
+    return canvas;
+  } catch (err) {
+    console.error('Error capturing screen:', err);
+    showToast('Errore durante la generazione dello screenshot', 'error');
+    return null;
+  }
+}
+
+if (exportImageBtn) {
+  exportImageBtn.addEventListener('click', async () => {
+    const canvas = await captureScreen();
+    if (canvas) {
+      canvas.toBlob(function(blob) {
+        saveAs(blob, `catastal_export_${new Date().getTime()}.jpg`);
+        showToast('Immagine esportata!', 'success');
+      }, 'image/jpeg', 0.9);
+    }
+  });
+}
+
+if (exportPdfBtn) {
+  exportPdfBtn.addEventListener('click', async () => {
+    const canvas = await captureScreen();
+    if (canvas) {
+      const imgData = canvas.toDataURL('image/jpeg', 0.9);
+      const { jsPDF } = window.jspdf;
+      
+      // Calcola proporzioni A4 Landscape
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4'
+      });
+      
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = pdf.internal.pageSize.getHeight();
+      
+      const imgProps = pdf.getImageProperties(imgData);
+      const ratio = imgProps.width / imgProps.height;
+      
+      let finalWidth = pdfWidth;
+      let finalHeight = finalWidth / ratio;
+      
+      if (finalHeight > pdfHeight) {
+        finalHeight = pdfHeight;
+        finalWidth = finalHeight * ratio;
+      }
+      
+      // Centra l'immagine nel PDF
+      const x = (pdfWidth - finalWidth) / 2;
+      const y = (pdfHeight - finalHeight) / 2;
+      
+      pdf.addImage(imgData, 'JPEG', x, y, finalWidth, finalHeight);
+      pdf.save(`catastal_report_${new Date().getTime()}.pdf`);
+      showToast('PDF esportato!', 'success');
+    }
+  });
+}
