@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Catastal - Mappa Catastale Satellitare & Misurazione Terreni</title>
+  
+  <!-- Leaflet CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <!-- Proj4 & Proj4Leaflet for EPSG:6706 and WMS transformation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.9.0/proj4.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4leaflet/1.0.2/proj4leaflet.min.js"></script>
+
+  <!-- Leaflet-Geoman for advanced polygon, polyline, lasso and freehand editing -->
+  <link rel="stylesheet" href="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.css" />
+  <script src="https://unpkg.com/@geoman-io/leaflet-geoman-free@latest/dist/leaflet-geoman.min.js"></script>
+
+  <!-- Turf.js for accurate geodesic area and perimeter calculation -->
+  <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+
+  <!-- FontAwesome Icons & Google Fonts -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div id="app">
+    <!-- Top Header Bar -->
+    <header class="top-bar">
+      <div class="brand">
+        <i class="fa-solid fa-layer-group brand-icon"></i>
+        <span class="brand-title">Catastal<span class="brand-badge">GIS</span></span>
+      </div>
+
+      <!-- Search Input -->
+      <div class="search-box">
+        <i class="fa-solid fa-magnifying-glass search-icon"></i>
+        <input type="text" id="searchInput" placeholder="Cerca indirizzo, località, comune (es. Chieti, Strada San Salvatore)..." />
+        <button id="searchBtn" title="Cerca"><i class="fa-solid fa-arrow-right"></i></button>
+        <div id="searchResults" class="search-results hidden"></div>
+      </div>
+
+      <!-- Quick Preset Buttons -->
+      <div class="quick-nav">
+        <button id="presetChietiBtn" class="pill-btn"><i class="fa-solid fa-location-dot"></i> Chieti (P.lla 8, Fg 21)</button>
+        <button id="locateMeBtn" class="pill-btn"><i class="fa-solid fa-crosshairs"></i> La mia posizione</button>
+      </div>
+    </header>
+
+    <!-- Map Container -->
+    <div id="map"></div>
+
+    <!-- Floating Tool Panel (Left) -->
+    <aside class="floating-panel left-panel">
+      <div class="panel-card">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-sliders"></i> Livelli Mappa</h3>
+        </div>
+        
+        <!-- Base Layer Selector -->
+        <div class="control-group">
+          <label>Mappa di Sfondo:</label>
+          <div class="radio-toggle">
+            <label class="radio-btn">
+              <input type="radio" name="basemap" value="googleSat" checked>
+              <span>Google Sat</span>
+            </label>
+            <label class="radio-btn">
+              <input type="radio" name="basemap" value="esriSat">
+              <span>Esri HD</span>
+            </label>
+            <label class="radio-btn">
+              <input type="radio" name="basemap" value="osm">
+              <span>Stradale</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Catasto Layer Controls -->
+        <div class="control-group">
+          <div class="toggle-row">
+            <span class="toggle-title"><i class="fa-solid fa-landmark"></i> Catasto Agenzia Entrate</span>
+            <label class="switch">
+              <input type="checkbox" id="catastoToggle" checked>
+              <span class="slider round"></span>
+            </label>
+          </div>
+          
+          <div class="slider-row">
+            <div class="slider-label">
+              <span>Opacità Catasto</span>
+              <span id="opacityVal">85%</span>
+            </div>
+            <input type="range" id="opacitySlider" min="0" max="100" value="85" />
+          </div>
+
+          <div class="layer-options">
+            <label><input type="checkbox" id="layerParticelle" checked> Particelle & Fogli</label>
+            <label><input type="checkbox" id="layerFabbricati" checked> Fabbricati</label>
+            <label><input type="checkbox" id="layerCodici" checked> Numeri Particella</label>
+          </div>
+        </div>
+
+        <!-- Zoom Indicator & Notice -->
+        <div class="info-alert" id="zoomAlert">
+          <i class="fa-solid fa-circle-info"></i>
+          <span id="zoomAlertText">Zoom attuale: 17 (I numeri delle particelle compaiono a zoom ≥ 15)</span>
+        </div>
+      </div>
+
+      <!-- Quick Draw Mode Card -->
+      <div class="panel-card">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-draw-polygon"></i> Strumenti Misura</h3>
+        </div>
+        <div class="action-grid">
+          <button id="drawPolygonBtn" class="action-btn" title="Disegna poligono punto a punto">
+            <i class="fa-solid fa-draw-polygon"></i> Poligono
+          </button>
+          <button id="drawLassoBtn" class="action-btn" title="Disegna a mano libera tenendo premuto">
+            <i class="fa-solid fa-pencil"></i> Lazo / Libera
+          </button>
+          <button id="clearMeasurementsBtn" class="action-btn danger" title="Elimina tutte le misurazioni">
+            <i class="fa-solid fa-trash-can"></i> Cancella
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Floating Measurement Card (Right) -->
+    <aside class="floating-panel right-panel" id="measurePanel">
+      <div class="panel-card live-stats-card">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-chart-area"></i> Misura Particella</h3>
+          <span class="status-indicator active"></span>
+        </div>
+
+        <div class="stats-metric-primary">
+          <div class="metric-label">AREA TOTALE</div>
+          <div class="metric-value" id="areaM2">0.00 <span class="unit">m²</span></div>
+        </div>
+
+        <div class="stats-secondary-grid">
+          <div class="sec-metric">
+            <span class="sec-label">Ettari (ha):</span>
+            <span class="sec-val" id="areaHa">0.0000 ha</span>
+          </div>
+          <div class="sec-metric">
+            <span class="sec-label">Are / Centiare:</span>
+            <span class="sec-val" id="areaAreCentiare">0 a 0 ca</span>
+          </div>
+          <div class="sec-metric">
+            <span class="sec-label">Perimetro:</span>
+            <span class="sec-val" id="perimetroM">0.00 m</span>
+          </div>
+          <div class="sec-metric">
+            <span class="sec-label">Punti / Vertici:</span>
+            <span class="sec-val" id="vertexCount">0</span>
+          </div>
+        </div>
+
+        <!-- Coordinates and Info -->
+        <div class="centroid-info">
+          <i class="fa-solid fa-location-crosshairs"></i>
+          <span id="centroidCoords">Clicca sulla mappa o traccia un poligono</span>
+        </div>
+
+        <!-- Action Export Buttons -->
+        <div class="export-actions">
+          <button id="exportGeoJsonBtn" class="export-btn" title="Scarica GeoJSON">
+            <i class="fa-solid fa-file-code"></i> GeoJSON
+          </button>
+          <button id="exportKmlBtn" class="export-btn" title="Scarica KML per Google Earth">
+            <i class="fa-solid fa-earth-americas"></i> KML
+          </button>
+          <button id="copyStatsBtn" class="export-btn" title="Copia riepilogo negli appunti">
+            <i class="fa-solid fa-copy"></i> Copia
+          </button>
+        </div>
+      </div>
+
+      <!-- Cadastral Inspection / Click Card -->
+      <div class="panel-card" id="cadastralInfoCard">
+        <div class="card-header">
+          <h3><i class="fa-solid fa-circle-question"></i> Info Punto Catastale</h3>
+        </div>
+        <div id="cadastralDetails" class="cadastral-details-empty">
+          Fai clic su qualsiasi punto della mappa per rilevare coordinate, comune e interrogare il catasto.
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
