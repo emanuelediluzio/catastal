@@ -1,6 +1,5 @@
 <div align="center">
-  <img src="https://raw.githubusercontent.com/emanuelediluzio/catastal/main/public/favicon.ico" width="80" alt="Catastal GIS Logo">
-  <h1>Catastal GIS 🗺️</h1>
+  <h1>🗺️ Catastal GIS</h1>
   <p><strong>Applicazione WebGIS open-source per la consultazione e misurazione delle particelle catastali in Italia.</strong></p>
 
   [![Vercel Deployment](https://img.shields.io/badge/Vercel-Deployed-000000?style=for-the-badge&logo=vercel)](https://catastal.vercel.app/)
@@ -16,8 +15,9 @@
 <br>
 
 ## 📸 Anteprima
-*(Aggiungi qui uno screenshot dell'interfaccia dell'applicazione)*
-<!-- ![Screenshot dell'app](link-allo-screenshot.png) -->
+<div align="center">
+  <img src="public/screenshot.jpg" alt="Catastal GIS Screenshot" width="100%">
+</div>
 
 ---
 
