@@ -272,6 +272,14 @@ body, html {
   box-shadow: 0 6px 20px rgba(37, 99, 235, 0.7);
 }
 
+.panel-collapse-btn i {
+  transition: transform 0.3s ease;
+}
+
+.floating-panel.collapsed .panel-collapse-btn i {
+  transform: rotate(180deg);
+}
+
 /* Floating Panels */
 .floating-panel {
   position: absolute;
@@ -884,8 +892,8 @@ input[type=range] {
   }
   
   /* Fix collapsed transform so button stays on screen */
-  .left-panel.collapsed { transform: translateX(calc(-100% - 8px)); }
-  .right-panel.collapsed { transform: translateX(calc(100% + 8px)); }
+  .left-panel.collapsed { transform: translateX(-100%); }
+  .right-panel.collapsed { transform: translateX(100%); }
   
   .coord-bar {
     font-size: 0.65rem;
