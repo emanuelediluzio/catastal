@@ -1,5 +1,13 @@
 // Catastal WebGIS Application Logic
 
+// Auto-collapse panels on mobile devices on load
+if (window.innerWidth <= 700) {
+  const leftPanel = document.getElementById('leftPanel');
+  const rightPanel = document.getElementById('rightPanel');
+  if (leftPanel) leftPanel.classList.add('collapsed');
+  if (rightPanel) rightPanel.classList.add('collapsed');
+}
+
 // EPSG:6706 (RDN2008 / geographic 2D) used by Agenzia delle Entrate WMS
 proj4.defs('EPSG:6706', '+proj=longlat +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +no_defs');
 
@@ -262,6 +270,11 @@ map.on('pm:create', e => {
   layer.on('pm:vertexadded', () => updateMeasurements(layer));
   layer.on('pm:vertexremoved', () => updateMeasurements(layer));
   layer.on('click', () => updateMeasurements(layer));
+  
+  if (window.innerWidth <= 700) {
+    document.getElementById('rightPanel').classList.remove('collapsed');
+    document.getElementById('leftPanel').classList.add('collapsed');
+  }
 });
 
 map.on('pm:remove', e => {
@@ -279,6 +292,7 @@ map.on('pm:remove', e => {
 document.getElementById('drawPolygonBtn').addEventListener('click', () => {
   map.pm.enableDraw('Polygon', { snappable: true, snapDistance: 20, finishOn: 'dblclick' });
   showToast('📐 Clicca per aggiungere vertici, doppio clic per chiudere');
+  if (window.innerWidth <= 700) document.getElementById('leftPanel').classList.add('collapsed');
 });
 
 // Lasso / Freehand
@@ -300,6 +314,7 @@ drawLassoBtn.addEventListener('click', () => {
     map.dragging.disable();
     map.getContainer().style.cursor = 'crosshair';
     map.on('mousedown', startLasso);
+    if (window.innerWidth <= 700) document.getElementById('leftPanel').classList.add('collapsed');
     map.on('mousemove', trackLasso);
     map.on('mouseup', finishLasso);
     showToast('✏️ Tieni premuto e disegna il contorno del terreno');
@@ -352,6 +367,7 @@ function finishLasso() {
 document.getElementById('measureDistanceBtn').addEventListener('click', () => {
   map.pm.enableDraw('Line', { snappable: true, snapDistance: 20 });
   showToast('📏 Clicca per punti di misura, doppio clic per finire');
+  if (window.innerWidth <= 700) document.getElementById('leftPanel').classList.add('collapsed');
 });
 
 document.getElementById('clearMeasurementsBtn').addEventListener('click', clearAllDrawings);
@@ -402,11 +418,21 @@ document.getElementById('layerCodici').addEventListener('change', updateWmsLayer
 
 // ---- PANEL COLLAPSE ----
 document.getElementById('collapseLeftBtn').addEventListener('click', () => {
-  document.getElementById('leftPanel').classList.toggle('collapsed');
+  const leftPanel = document.getElementById('leftPanel');
+  leftPanel.classList.toggle('collapsed');
+  
+  if (window.innerWidth <= 700 && !leftPanel.classList.contains('collapsed')) {
+    document.getElementById('rightPanel').classList.add('collapsed');
+  }
 });
 
 document.getElementById('collapseRightBtn').addEventListener('click', () => {
-  document.getElementById('rightPanel').classList.toggle('collapsed');
+  const rightPanel = document.getElementById('rightPanel');
+  rightPanel.classList.toggle('collapsed');
+  
+  if (window.innerWidth <= 700 && !rightPanel.classList.contains('collapsed')) {
+    document.getElementById('leftPanel').classList.add('collapsed');
+  }
 });
 
 // ---- GEOLOCATION ----
@@ -578,6 +604,12 @@ async function queryAndSelectParcel(lat, lng) {
       `;
 
       showToast(`📐 P.lla ${matchedFeature.properties.label} — ${Math.round(turf.area(matchedFeature)).toLocaleString('it-IT')} m²`);
+      
+      // Auto-expand right panel on mobile to show results
+      if (window.innerWidth <= 700) {
+        document.getElementById('rightPanel').classList.remove('collapsed');
+        document.getElementById('leftPanel').classList.add('collapsed');
+      }
     } else {
       cadastralDetailsEl.innerHTML = `
         <div style="font-size: 0.78rem; color: var(--accent-gold); line-height:1.4;">

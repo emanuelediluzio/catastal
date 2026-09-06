@@ -852,20 +852,51 @@ input[type=range] {
 }
 
 @media (max-width: 900px) {
-  .quick-nav { display: none; }
   .brand-title { display: none; }
   .left-panel, .right-panel { width: 260px; }
+  .pill-btn { font-size: 0; padding: 6px 10px; }
+  .pill-btn i { font-size: 1rem; margin: 0; }
+  #presetChietiBtn { display: none; }
 }
 
 @media (max-width: 700px) {
-  .left-panel { display: none; }
-  .right-panel {
-    left: 12px;
-    right: 12px;
-    width: auto;
-    top: auto;
-    bottom: 36px;
-    max-height: 50vh;
+  .top-bar {
+    top: 8px; left: 8px; right: 8px;
+    padding: 0 10px;
+  }
+  .left-panel, .right-panel { 
+    width: 280px; 
+    top: 70px;
+    max-height: calc(100vh - 110px);
+  }
+  .left-panel { left: 8px; display: flex; }
+  .right-panel { right: 8px; left: auto; top: 70px; bottom: auto; max-height: calc(100vh - 110px); display: flex; }
+  
+  /* Make sure collapse buttons are large and always visible on mobile */
+  .panel-collapse-btn {
+    width: 44px; height: 44px;
+    right: -44px;
+    border-radius: 0 8px 8px 0;
+    box-shadow: 4px 0 10px rgba(0,0,0,0.3);
+  }
+  .panel-collapse-btn.right {
+    left: -44px; right: auto;
+    border-radius: 8px 0 0 8px;
+    box-shadow: -4px 0 10px rgba(0,0,0,0.3);
+  }
+  
+  /* Fix collapsed transform so button stays on screen */
+  .left-panel.collapsed { transform: translateX(calc(-100% - 8px)); }
+  .right-panel.collapsed { transform: translateX(calc(100% + 8px)); }
+  
+  .coord-bar {
+    font-size: 0.65rem;
+    padding: 0 5px;
+  }
+  
+  /* Make the floating panels visually separate when open */
+  .left-panel:not(.collapsed), .right-panel:not(.collapsed) {
+    box-shadow: 0 10px 40px rgba(0,0,0,0.8);
   }
 }
 

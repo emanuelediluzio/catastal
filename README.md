@@ -16,7 +16,8 @@
 
 ## 📸 Anteprima
 <div align="center">
-  <img src="public/screenshot.jpg" alt="Catastal GIS Screenshot" width="100%">
+  <img src="public/screenshot.jpg" alt="Catastal GIS Screenshot" width="65%">
+  <img src="public/screenshot_mobile.jpg" alt="Catastal GIS Mobile" width="32%">
 </div>
 
 ---
