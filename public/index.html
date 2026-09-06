@@ -265,6 +265,30 @@
 
     <!-- Toast Notification -->
     <div id="toast" class="toast hidden"></div>
+    
+    <!-- Guide Modal -->
+    <div id="guideModal" class="modal-overlay hidden">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2><i class="fa-solid fa-book-open"></i> Guida Rapida</h2>
+          <button id="closeGuideBtn" class="modal-close"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+          <div class="guide-section">
+            <h3><i class="fa-solid fa-hand-pointer"></i> Informazioni Particella</h3>
+            <p>Fai clic su qualsiasi punto della mappa per interrogare il database WFS dell'Agenzia delle Entrate. Ottieni immediatamente <strong>area, confini e dati identificativi (Foglio, Particella, Comune)</strong>.</p>
+          </div>
+          <div class="guide-section">
+            <h3><i class="fa-solid fa-draw-polygon"></i> Strumenti di Disegno</h3>
+            <p>Usa il pannello di sinistra per disegnare a mano libera (lazo), poligoni punto-a-punto o misurare distanze. I poligoni personalizzati calcoleranno l'area in tempo reale.</p>
+          </div>
+          <div class="guide-section">
+            <h3><i class="fa-solid fa-download"></i> Esportazione</h3>
+            <p>Esporta i tuoi rilievi in PDF, Immagine, KML (per Google Earth) o GeoJSON dal pannello di destra. I dati verranno salvati sul tuo dispositivo.</p>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <script src="app.js"></script>

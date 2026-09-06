@@ -795,35 +795,40 @@ if (guideBtn && guideModal && closeGuideBtn) {
 const exportImageBtn = document.getElementById('exportImageBtn');
 const exportPdfBtn = document.getElementById('exportPdfBtn');
 
-async function captureScreen() {
-  showToast('Generazione in corso... attendi.', 'info');
+async function captureMap() {
+  showToast('Generazione mappa in corso... attendi.', 'info');
   try {
-    const canvas = await html2canvas(document.body, {
+    const mapEl = document.getElementById('map');
+    // Hide Geoman controls during capture
+    const pmControls = document.querySelector('.leaflet-pm-toolbar');
+    const zoomControls = document.querySelector('.leaflet-control-zoom');
+    if (pmControls) pmControls.style.display = 'none';
+    if (zoomControls) zoomControls.style.display = 'none';
+    
+    const canvas = await html2canvas(mapEl, {
       useCORS: true,
-      allowTaint: true,
-      ignoreElements: (el) => {
-        // Nascondi i bottoni durante lo screenshot
-        if (el.classList.contains('export-actions') || el.classList.contains('panel-collapse-btn')) {
-          return true;
-        }
-        return false;
-      }
+      allowTaint: true
     });
+    
+    // Restore controls
+    if (pmControls) pmControls.style.display = '';
+    if (zoomControls) zoomControls.style.display = '';
+    
     return canvas;
   } catch (err) {
-    console.error('Error capturing screen:', err);
-    showToast('Errore durante la generazione dello screenshot', 'error');
+    console.error('Error capturing map:', err);
+    showToast('Errore durante la generazione dello screenshot della mappa', 'error');
     return null;
   }
 }
 
 if (exportImageBtn) {
   exportImageBtn.addEventListener('click', async () => {
-    const canvas = await captureScreen();
+    const canvas = await captureMap();
     if (canvas) {
       canvas.toBlob(function(blob) {
-        saveAs(blob, `catastal_export_${new Date().getTime()}.jpg`);
-        showToast('Immagine esportata!', 'success');
+        saveAs(blob, `catastal_map_${new Date().getTime()}.jpg`);
+        showToast('Mappa esportata!', 'success');
       }, 'image/jpeg', 0.9);
     }
   });
@@ -831,39 +836,48 @@ if (exportImageBtn) {
 
 if (exportPdfBtn) {
   exportPdfBtn.addEventListener('click', async () => {
-    const canvas = await captureScreen();
+    const canvas = await captureMap();
     if (canvas) {
-      const imgData = canvas.toDataURL('image/jpeg', 0.9);
+      const imgData = canvas.toDataURL('image/jpeg', 0.8);
       const { jsPDF } = window.jspdf;
       
-      // Calcola proporzioni A4 Landscape
-      const pdf = new jsPDF({
-        orientation: 'landscape',
-        unit: 'mm',
-        format: 'a4'
-      });
+      const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
       
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
+      // Header
+      pdf.setFontSize(22);
+      pdf.setTextColor(37, 99, 235); // primary color
+      pdf.text("Report Catastale", 15, 20);
       
+      pdf.setFontSize(10);
+      pdf.setTextColor(100, 100, 100);
+      pdf.text(`Generato il: ${new Date().toLocaleString('it-IT')}`, 15, 28);
+      
+      // Dati
+      pdf.setFontSize(12);
+      pdf.setTextColor(0, 0, 0);
+      const areaM2 = document.getElementById('areaM2').innerText;
+      const areaHa = document.getElementById('areaHa').innerText;
+      const perimetro = document.getElementById('perimetroM').innerText;
+      
+      let startY = 40;
+      pdf.text(`Area Totale: ${areaM2}`, 15, startY);
+      pdf.text(`Ettari: ${areaHa}`, 15, startY + 8);
+      pdf.text(`Perimetro: ${perimetro}`, 15, startY + 16);
+      
+      // Map Image
+      const pdfWidth = pdf.internal.pageSize.getWidth() - 30; // 15mm margin
       const imgProps = pdf.getImageProperties(imgData);
       const ratio = imgProps.width / imgProps.height;
+      const finalHeight = pdfWidth / ratio;
       
-      let finalWidth = pdfWidth;
-      let finalHeight = finalWidth / ratio;
+      pdf.addImage(imgData, 'JPEG', 15, startY + 25, pdfWidth, finalHeight);
       
-      if (finalHeight > pdfHeight) {
-        finalHeight = pdfHeight;
-        finalWidth = finalHeight * ratio;
-      }
+      // Footer
+      pdf.setFontSize(8);
+      pdf.text("Catastal GIS - Agenzia delle Entrate (CC-BY 4.0)", 15, pdf.internal.pageSize.getHeight() - 10);
       
-      // Centra l'immagine nel PDF
-      const x = (pdfWidth - finalWidth) / 2;
-      const y = (pdfHeight - finalHeight) / 2;
-      
-      pdf.addImage(imgData, 'JPEG', x, y, finalWidth, finalHeight);
       pdf.save(`catastal_report_${new Date().getTime()}.pdf`);
-      showToast('PDF esportato!', 'success');
+      showToast('Report PDF esportato!', 'success');
     }
   });
 }
