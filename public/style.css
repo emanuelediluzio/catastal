@@ -297,11 +297,11 @@ body, html {
 }
 
 .floating-panel.collapsed {
-  transform: translateX(-115%);
+  transform: translateX(-100%);
 }
 
 .floating-panel.collapsed.right-panel {
-  transform: translateX(115%);
+  transform: translateX(100%);
 }
 
 .left-panel {

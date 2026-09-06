@@ -135,21 +135,7 @@ const parcelVectorLayer = L.geoJSON(null, {
 let locationMarker = null;
 let locationCircle = null;
 
-// Leaflet-Geoman Toolbar
-map.pm.addControls({
-  position: 'topright',
-  drawCircle: false,
-  drawCircleMarker: false,
-  drawMarker: false,
-  drawText: false,
-  drawPolyline: true,
-  drawRectangle: true,
-  drawPolygon: true,
-  editMode: true,
-  dragMode: true,
-  cutPolygon: false,
-  removalMode: true
-});
+// Native Leaflet-Geoman Toolbar removed because we use custom buttons in the left panel
 
 map.pm.setGlobalOptions({
   pathOptions: {
