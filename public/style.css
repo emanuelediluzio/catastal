@@ -289,13 +289,11 @@ body, html {
 }
 
 .floating-panel.collapsed {
-  transform: translateX(-110%);
-  opacity: 0;
-  pointer-events: none;
+  transform: translateX(-115%);
 }
 
 .floating-panel.collapsed.right-panel {
-  transform: translateX(110%);
+  transform: translateX(115%);
 }
 
 .left-panel {
@@ -897,6 +895,21 @@ input[type=range] {
   /* Make the floating panels visually separate when open */
   .left-panel:not(.collapsed), .right-panel:not(.collapsed) {
     box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+  }
+  
+  /* Push Leaflet controls down so they don't overlap the top bar */
+  .leaflet-top {
+    top: 70px !important;
+  }
+  
+  /* Make sure Geoman controls don't overlap with the right panel collapse button */
+  .leaflet-right {
+    right: 55px !important;
+  }
+  
+  /* Hide native zoom control on mobile to save space (use pinch-to-zoom) */
+  .leaflet-control-zoom {
+    display: none !important;
   }
 }
 
